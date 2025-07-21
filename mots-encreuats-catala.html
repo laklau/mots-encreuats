@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini-Joc de Mots Encreuats 🧠</title>
+  <style>
+  /* ── Base: cos i capçaleres ───────────────────────────────────────── */
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #f7fae6;
+    text-align: center;
+    padding: 20px;
+  }
+  h1 {
+    color: #333;
+  }
+
+  /* ── Botó principal ───────────────────────────────────────────────── */
+  #boto {
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #2b8be1;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  #boto:hover {
+    background-color: #1c6fb8;
+  }
+
+  /* ── Contenidor de joc: graella + definicions ─────────────────────── */
+  #joc {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  /* ── Graella de paraules ──────────────────────────────────────────── */
+  #graella {
+    display: grid;
+    gap: 2px;
+    justify-content: center;
+    margin-bottom: 30px;
+    flex: 1 1 auto;
+    max-width: 600px;
+  }
+
+  /* ── Definicions ─────────────────────────────────────────────────── */
+  #definicions {
+    text-align: left;
+    font-size: 22px;
+    flex: 0 0 450px;
+    max-width: 450px;
+  }
+
+  /* ── Missatge final ───────────────────────────────────────────────── */
+  #missatge-final {
+    font-size: 22px;
+    color: #009933;
+    margin-top: 20px;
+    font-weight: bold;
+  }
+
+  /* ── Cel·les de la graella ─────────────────────────────────────────── */
+  .casella {
+    width: 30px;
+    height: 30px;
+    background-color: white;
+    border: 1px solid #999;
+    position: relative;
+  }
+  .casella.gris {
+    background-color: grey;
+  }
+
+  /* ── Inputs dins les cel·les ──────────────────────────────────────── */
+  .casella input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    text-transform: uppercase;
+    text-align: center;
+    font-size: 18px;
+    outline: none;
+    color: black;      /* color per defecte */
+    font-weight: normal;
+  }
+
+  /* ── Estat focus ──────────────────────────────────────────────────── */
+  .casella input:focus {
+    background-color: #ddf7ff;
+  }
+
+  /* ── Paraula completament correcta ───────────────────────────────── */
+  /* només en aquest estat pintem de verd */
+  input.correcte {
+    color: green !important;
+    font-weight: bold;
+  }
+
+  /* ── Botó de pista ────────────────────────────────────────────────── */
+  .pista-btn {
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* ── Responsive: definicions sota graella en pantalles petites ───── */
+  @media (max-width: 768px) {
+    #joc {
+      flex-direction: column;
+      align-items: center;
+    }
+    #definicions {
+      margin-top: 20px;
+      flex: none;
+      width: 100%;
+      max-width: none;
+    }
+  }
+/* Container per a les peces de confeti */
+#confetti-container {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 9999;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 6px; height: 6px;
+  transform-origin: center;
+  animation: confetti-fall linear 1, confetti-rotate linear 1;
+}
+
+@keyframes confetti-fall {
+  to { transform: translateY(110vh); opacity: 0; }
+}
+@keyframes confetti-rotate {
+  to { transform: rotateZ(360deg); }
+}
+</style>
+
+
+</head>
+<body>
+  <h1>Mini-Joc de Mots Encreuats 🧠</h1>
+  <button id="boto">Jugar</button>
+  <div id="missatge-final"></div>
+  <div id="joc">
+    <div id="graella"></div>
+    <div id="definicions"></div>
+  </div>
+<div id="confetti-container"></div>
+
+<script>
+  // === CONFIGURACIÓ ===
+  const GRID_SIZE         = 20;
+  const NUM_WORDS         = 10;
+  const MIN_TOTAL_CROSSES = 3;
+
+  const DICCIONARI = {
+      "GAT":    "😺 Animal domèstic que fa miau",
+      "GOS":    "🐶 Animal domèstic que fa guau",
+      "OS":     "🐻 Animal gran que viu al bosc",
+      "PEIX":   "🐠 Animal que viu a l'aigua",
+      "GALL":   "🐔 Animal de granja que fa quiquiriquí",
+      "VACA":   "🐄 Animal de granja que dona llet",
+      "OVELLA": "🐑 Animal de granja amb llana",
+      "PORC":   "🐷 Animal de granja que fa oinc",
+      "RATA":   "🐀 Animal petit amb cua llarga",
+      "LLOP":   "🐺 Animal salvatge que crida a la lluna",
+      "OCELL":  "🕊️ Animal que vola pel cel",
+      "CONILL": "🐇 Animal amb orelles llargues",
+      "CAVALL": "🐴 Animal gran que galopa",
+      "ZEBRA":  "🦓 Animal amb ratlles negres i blanques",
+      "LLEÓ":  "🦁 Animal salvatge amb melena",
+      "ELEFANT":"🐘 Animal molt gran amb trompa",
+      "GIRAFA": "🦒 Animal amb coll molt llarg",
+      "DOFÍ":  "🐬 Animal intel·ligent que viu al mar",
+      "SERP":   "🐍 Animal llarg que repta",
+      "GRANOTA":"🐸 Animal verd que salta i croa",
+      "VERMELL":"🟥 Color del foc i de la sang",
+      "BLAU":   "🔵 Color del cel i del mar",
+      "VERD":   "🟩 Color de l'herba i les fulles",
+      "GROC":   "🟨 Color del sol i dels pollastres",
+      "ROSA":   "🌸 Color suau dels pètals d'algunes flors",
+      "NEGRE":  "⚫ Color de la nit i del carbó",
+      "BLANC":  "⚪ Color de la neu i dels núvols",
+      "TARONJA":"🍊 Color de la fruita del mateix nom",
+      "LILA":   "💜 Color suau entre blau i rosa",
+      "GRIS":   "🌫️ Color entre blanc i negre",
+      "MARRO":  "🟫 Color de la terra i el fang",
+      "VIOLETA":"🔮 Color fosc entre blau i lila",
+      "VERMELL":"🍅 Color intens com el tomàquet",
+      "DAURAT": "🏅 Color brillant com l'or",
+      "PLATEJAT":"🥈 Color brillant com la plata",
+      "CAP":    "🧠 Part del cos on hi ha el cervell",
+      "CARA":   "🙂 Part del cos on hi ha els ulls i la boca",
+      "ULLS":   "👀 Els usem per veure",
+      "NAS":    "👃 El fem servir per olorar",
+      "BOCA":   "👄 Hi posem el menjar",
+      "DENTS":  "🦷 Les usem per mastegar",
+      "MANS":   "🤚 Les usem per agafar coses",
+      "PEUS":   "🦶 Els usem per caminar",
+      "CAMES":  "🦵 Uneixen els peus amb el cos",
+      "BRAÇOS": "💪 Uneixen les mans amb el cos",
+      "ORELLA": "👂 La usem per sentir",
+      "COLL":   "🦴 Part que uneix el cap amb el cos",
+      "ESQUENA":"🏋️ Part del darrere del cos",
+      "PANXA":  "🤰 Part del cos on hi ha l'estómac",
+      "GENOLL": "🤸 Articulació del mig de la cama",
+      "CELLA":  "😌 Pels que tenim sobre els ulls",
+      "BARBA":  "🧔 Pels que creixen a la cara",
+      "CABELLS":"💇 Pels que tenim al cap",
+      "FRONT":  "💭 Part alta de la cara",
+      "GALTES": "😊 Parts laterals de la cara",
+      "MARE":   "👩 Dona que té fills",
+      "PARE":   "👨 Home que té fills",
+      "FILL":   "👦 Nen respecte als seus pares",
+      "FILLA":  "👧 Nena respecte als seus pares",
+      "AVI":    "👴 Pare del pare o la mare",
+      "AVIA":   "👵 Mare del pare o la mare",
+      "GERMA":  "👬 Nen que té els mateixos pares",
+      "GERMANA":"👭 Nena que té els mateixos pares",
+      "TIA":    "👱‍♀️ Germana del pare o la mare",
+      "ONCLE":  "👱‍♂️ Germà del pare o la mare",
+      "POMA":   "🍎 Fruita vermella o verda que creix als arbres",
+      "PLÀTAN": "🍌 Fruita groga i allargada",
+      "MANDARINA":"🍊 Fruita petita, rodona i taronja",
+      "LLIMONA":"🍋 Fruita groga i àcida",
+      "MADUIXA":"🍓 Fruita petita i vermella",
+      "CIRERES":"🍒 Fruites petites i vermelles amb pinyol",
+      "RAIM":   "🍇 Fruita dolça que creix a les vinyes",
+      "PERA":   "🍐 Fruita verda amb forma allargada",
+      "PRUNA":  "🍑 Fruita morada amb pinyol",
+      "PINYA":  "🍍 Fruita tropical amb fulles al damunt",
+      "MELO":   "🍈 Fruita gran i verda per fora",
+      "SINDRIA":"🍉 Fruita gran i verda amb interior roig i moltes llavors",
+      "KIWI":   "🥝 Fruita petita i peluda, marronosa per fora i verda pel dins",
+      "MANGO":  "🥭 Fruita tropical de color groc ataronjat, amb un gran pinyol",
+      "AMETLLA":"🌰 Fruita seca blanca per dins i amb una pell marró",
+      "AVELLANA":"🌰 Fruita seca dura, petita i arrodonida que es fa servir a per fer crema de cacao",
+      "CASTANYA":"🌰 Fruita seca que es menja a la tardor",
+      "NOUS":   "🌰 Fruit sec amb closca dura i forma de cervell",
+      "PA":     "🍞 Aliment fet amb farina i aigua",
+      "LLET":   "🥛 Beguda blanca que donen les vaques",
+      "OU":     "🥚 El posen les gallines",
+      "CARN":   "🥩 Aliment que prové dels animals",
+      "FORMATGE":"🧀 Aliment fet amb llet",
+      "IOGURT": "🥛 Aliment que es fa amb llet fermentada, cremós i una mica àcid",
+      "PIZZA":  "🍕 Massa rodona amb tomàquet i formatge que es cuina al forn",
+      "PASTA":  "🍝 Aliment italià fet amb farina que s'ha de bullir abans de menjar",
+      "ARROS":  "🍚 Gra petit i blanc que es cou",
+      "SOPA":   "🍜 Menjar líquid que es pren calent",
+      "GALETES":"🍪 Dolços petits, plans, rodons i cruixents",
+      "XOCOLATA":"🍫 El que més m'agrada per verenar és pa amb .... sense pa 🎵",
+      "MEL":    "🍯 Dolç que fan les abelles",
+      "SUCRE":  "🧂 Pols blanca que endolceix",
+      "VORERA":"🛣️ Part del carrer per on caminen les persones",
+      "CARRER":"🛣️ Via per on circulen els cotxes",
+      "COTXE":  "🚗 Vehicle amb quatre rodes",
+      "CIUTAT": "🏙️ Lloc gran on viu molta gent",
+      "POBLE":  "🏘️ Lloc petit on viu poca gent",
+      "ESCOLA": "🏫 Lloc on van els nens a aprendre",
+      "PARC":   "🏞️ Lloc amb tobogan per jugar i passejar",
+      "BOTIGA": "🏪 Lloc on es compren coses",
+      "FARMACIA":"🏥 Lloc on es compren medicaments",
+      "HOSPITAL":"🏨 Lloc on curen els malalts",
+      "CINEMA": "🎬 Lloc on es veuen pel·lícules",
+      "PLATJA": "🏖️ Lloc amb sorra i mar",
+      "MUNTANYA":"⛰️ Elevació molt alta de terra",
+      "PONT":   "🌉 Construcció per creuar rius",
+      "ESTACIO":"🚉 Lloc on paren els trens",
+      "AUTOBUS":"🚌 Vehicle gran i llargat per a moltes persones",
+      "BICICLETA":"🚲 Vehicle de dues rodes que es pedala",
+      "SEMÀFOR":"🚦 Llums que regulen el trànsit",
+      "BANC":   "🏦 Lloc on es guarden els diners",
+      "MERCAT": "🛒 Lloc on es venen aliments",
+      "FORN":   "🍞 Lloc on es fa el pa",
+      "CARNISSERIA":"🥩 Lloc on es ven carn",
+      "BIBLIOTECA":"📚 Lloc ple de llibres",
+      "MUSEU":  "🖼️ Lloc on es mostren obres d'art",
+      "RESTAURANT":"🍽️ Lloc on es menja fora de casa",
+      "CAFETERIA":"☕ Lloc on es pren cafè",
+      "CASA":   "🏠 Lloc on vivim",
+      "PORTA":  "🚪 S'obre i es tanca per entrar",
+      "FINESTRA":"🪟 S'obre per veure fora",
+      "TAULA":  "📐 Moble pla per menjar",
+      "CADIRA": "💺 Moble per seure",
+      "LLIT":   "🛏️ Moble per dormir",
+      "SOFÀ":   "🛋️ Moble gran i acolxat per seure",
+      "CUINA":  "🍳 Habitació per cuinar",
+      "BANY":   "🚿 Habitació per rentar-se",
+      "JARDÍ":  "🌳 Espai verd al voltant d'una casa",
+      "PILOTA": "⚽ Objecte rodó per jugar",
+      "JOGUINA":"🧸 Objecte per jugar",
+      "LLIBRE": "📖 Objecte de paper per llegir",
+      "LLAPIS": "✏️ Objecte per escriure al que se li pot fer punta",
+      "TELÈFON":"📱 Objecte per parlar amb gent",
+      "RELLOTGE":"⏰ Objecte que marca l'hora",
+      "MIRALL": "🪞 Objecte on es veu la imatge reflectida",
+      "ESCALA": "🪜 Serveix per pujar i baixar d'un pis a l'altre",
+      "BALCÓ":  "🏡 Espai obert a l'exterior d'una casa",
+      "PATI":   "🏖️ Espai gran obert fora d'una casa però que forma part de la casa",
+      "SOL":    "🌞 Estrella que il·lumina el dia",
+      "LLUNA":  "🌜 Satèl·lit que es veu a la nit",
+      "ESTRELLA":"⭐ Punt de llum al cel nocturn",
+      "NUVOL":  "☁️ Massa blanca que vola pel cel i fa ploure",
+      "PLUJA":  "🌧️ Aigua que cau del cel",
+      "VENT":   "🌬️ Aire que es mou",
+      "ARBRE":  "🌲 Planta alta amb tronc",
+      "FLOR":   "🌸 Part colorida de les plantes",
+      "HERBA":  "🌿 Planta petita i verda",
+      "FULLA":  "🍃 Part verda dels arbres",
+      "BRANCA": "🌴 Part de l'arbre que surt del tronc",
+      "TERRA":  "🌎 Planeta on vivim",
+      "PEDRA":  "🪨 Material dur del sol",
+      "AIGUA":  "💧 Líquid transparent que bevem",
+      "FOC":    "🔥 Flama que crema i fa calor",
+      "CORRER": "🏃 Avançar molt de pressa",
+      "SALTAR": "🤸 Aixecar-se de terra amb els peus",
+      "JUGAR":  "🎲 Fer activitats divertides amb joguines o amics",
+      "MENJAR": "🍴 Posar aliments a la boca i mastegar-los",
+      "DORMIR": "😴 Descansar amb els ulls tancats",
+      "CAMINAR":"🚶 Moure's amb els peus",
+      "PARLAR": "🗣️ Dir paraules amb la boca",
+      "ESCOLTAR":"👂 Usar les orelles per sentir",
+      "MIRAR":  "👀 Usar els ulls per veure",
+      "RIURE":  "😂 Fer soroll quan alguna cosa fa gràcia",
+      "DIA":    "🌞 Quan hi ha llum del sol",
+      "NIT":    "🌜 Quan està fosc i es veu la lluna",
+      "MATÍ":   "🌅 Primera part del dia",
+      "TARDA":  "🌇 Part del dia després de dinar",
+      "HIVERN": "❄️ Estació més freda de l'any",
+      "PRIMAVERA":"🌸 Estació quan surten les flors",
+      "ESTIU":  "☀️ Estació més calenta de l'any",
+      "TARDOR": "🍂 Estació quan cauen les fulles",
+      "FRED":   "🧊 Sensació de baixa temperatura",
+      "CALOR":  "🔥 Sensació de temperatura alta",
+      "AVUI":   "📆 Aquest dia",
+      "AHIR":   "⏮️ El dia anterior",
+      "DEMÀ":   "⏭️ El dia següent",
+      "SETMANA":"📅 Set dies seguits",
+      "MES":    "🗓️ Quatre setmanes seguïdes"
+    };
+
+
+  // === HELPERS ===
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function stripAccents(str) {
+    return str.normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase();
+  }
+
+  // === ESTAT GLOBAL ===
+  let grid, gridRows, gridCols;
+  let paraules = [];
+
+  // === ARRANCA ===
+  document.getElementById("boto").addEventListener("click", iniciarJoc);
+  document.addEventListener("DOMContentLoaded", iniciarJoc);
+
+  function iniciarJoc() {
+  // netegem la UI
+  document.getElementById("graella").innerHTML     = "";
+  document.getElementById("definicions").innerHTML = "";
+  document.getElementById("missatge-final").innerText = "";
+
+  // tria paraules i inicialitza graella
+  paraules = triaParaules();
+  initGrid();
+
+  // col·loca la primera al centre
+  posaPrimera(paraules[0]);
+
+  // col·loca la resta buscant creuaments
+  let totalCrosses = 0;
+  for (let i = 1; i < paraules.length; i++) {
+    totalCrosses += posaAmbCreu(paraules[i]);
+  }
+  console.log("Creuaments totals:", totalCrosses);
+
+  // ajusta límits, renderitza i mostra definicions
+  ajustaGrid();
+  renderitzaGrid();
+  mostraDefinicions();
+}
+
+  function triaParaules() {
+  // 1) Pilla NUM_WORDS entrades aleatòries
+  const entries = shuffle(Object.entries(DICCIONARI)).slice(0, NUM_WORDS);
+
+  // 2) Map a objectes i ordena per longitud descendent
+  const words = entries
+    .map(([text, def]) => ({
+      text,
+      def,
+      dir: Math.random() < 0.5 ? "h" : "v",
+      row: 0,
+      col: 0,
+      cells: [],
+      filled: false
+    }))
+    .sort((a, b) => b.text.length - a.text.length);
+
+  // 3) Assigna el número de pista segons l’ordre final
+  return words.map((w, i) => ({ ...w, numero: i + 1 }));
+}
+
+
+  function initGrid() {
+    grid = Array.from({ length: GRID_SIZE }, () =>
+      Array.from({ length: GRID_SIZE }, () => ({
+        char: null, black: true, number: null
+      }))
+    );
+    gridRows = gridCols = GRID_SIZE;
+  }
+
+  function posaPrimera(w) {
+    const L = w.text.length;
+    if (w.dir === "h") {
+      w.row = Math.floor(GRID_SIZE / 2);
+      w.col = Math.floor((GRID_SIZE - L) / 2);
+    } else {
+      w.col = Math.floor(GRID_SIZE / 2);
+      w.row = Math.floor((GRID_SIZE - L) / 2);
+    }
+    escriuParaula(w);
+  }
+
+  function posaAmbCreu(w) {
+  const L = w.text.length;
+  const candidats = [];
+
+  // 1) cerquem punts de creuament
+  paraules.forEach(pw => {
+    if (pw === w || !pw.cells.length) return;
+    pw.text.split("").forEach((chPw, iPw) => {
+      w.text.split("").forEach((chW, iW) => {
+        if (chPw === chW) {
+          const r0 = pw.row + (pw.dir==="v"?iPw:0) - (w.dir==="v"?iW:0);
+          const c0 = pw.col + (pw.dir==="h"?iPw:0) - (w.dir==="h"?iW:0);
+          if (potColocar(w, r0, c0)) {
+            candidats.push({ r0, c0 });
+          }
+        }
+      });
+    });
+  });
+
+  // si hi ha candidats, en deixem un aleatori
+  shuffle(candidats);
+  if (candidats.length) {
+    escriuParaula(w, candidats[0].r0, candidats[0].c0);
+    return 1;
+  }
+
+  // 2) fallback purament aleatori: L*10 intents
+  let tries = 0;
+  while (tries++ < L * 3) {
+    const r0 = Math.floor(Math.random() * (GRID_SIZE - (w.dir==="v"?L:1)));
+    const c0 = Math.floor(Math.random() * (GRID_SIZE - (w.dir==="h"?L:1)));
+    if (potColocar(w, r0, c0)) {
+      escriuParaula(w, r0, c0);
+      return 0;
+    }
+  }
+
+  // si no hem col·locat la paraula, tornem 0
+  return 0;
+}
+
+  function potColocar(w, r0, c0) {
+    const L = w.text.length;
+    for (let k = 0; k < L; k++) {
+      const r = r0 + (w.dir==="v"?k:0),
+            c = c0 + (w.dir==="h"?k:0);
+      if (r<0||c<0||r>=GRID_SIZE||c>=GRID_SIZE) return false;
+      const cell = grid[r][c];
+      if (!cell.black && cell.char !== w.text[k]) return false;
+      if (k===0 && cell.number!=null) return false;
+    }
+    return true;
+  }
+
+  function escriuParaula(w, r0=w.row, c0=w.col) {
+    w.row = r0; w.col = c0; w.cells = [];
+    for (let k = 0; k < w.text.length; k++) {
+      const r = r0 + (w.dir==="v"?k:0),
+            c = c0 + (w.dir==="h"?k:0);
+      grid[r][c] = {
+        char: w.text[k],
+        black: false,
+        number: k===0 ? w.numero : grid[r][c]?.number
+      };
+      w.cells.push({r,c});
+    }
+  }
+
+  function ajustaGrid() {
+    let minR=GRID_SIZE, minC=GRID_SIZE, maxR=-1, maxC=-1;
+    paraules.forEach(w => w.cells.forEach(({r,c}) => {
+      minR=Math.min(minR,r); maxR=Math.max(maxR,r);
+      minC=Math.min(minC,c); maxC=Math.max(maxC,c);
+    }));
+    if (maxR<minR||maxC<minC) { gridRows=gridCols=GRID_SIZE; return; }
+    gridRows=maxR-minR+1; gridCols=maxC-minC+1;
+    const newG = [];
+    for (let r=minR; r<=maxR; r++) {
+      const row=[];
+      for (let c=minC; c<=maxC; c++){
+        row.push({...grid[r][c]});
+      }
+      newG.push(row);
+    }
+    paraules.forEach(w => {
+      w.cells = w.cells.map(({r,c}) => ({
+        r: r-minR, c: c-minC
+      }));
+    });
+    grid=newG;
+  }
+
+  function renderitzaGrid() {
+    const cont = document.getElementById("graella");
+    cont.style.gridTemplateColumns = `repeat(${gridCols},30px)`;
+    cont.style.gridTemplateRows    = `repeat(${gridRows},30px)`;
+    cont.innerHTML = "";
+    for (let r=0; r<gridRows; r++){
+      for (let c=0; c<gridCols; c++){
+        const cel = document.createElement("div");
+        cel.className = grid[r][c].black ? "casella gris" : "casella";
+        if (!grid[r][c].black) {
+          const inp = document.createElement("input");
+          inp.maxLength = 1;
+          inp.dataset.r = r;
+          inp.dataset.c = c;
+          inp.addEventListener("input", onInput);
+          inp.addEventListener("keydown", gestorTecles);
+          // marcador de número
+          if (grid[r][c].number) {
+            const num = document.createElement("span");
+            num.style.cssText = "position:absolute;top:2px;left:2px;font-size:10px";
+            num.innerText = grid[r][c].number;
+            cel.appendChild(num);
+          }
+          cel.appendChild(inp);
+        }
+        cont.appendChild(cel);
+      }
+    }
+  }
+
+  function mostraDefinicions() {
+  const div = document.getElementById("definicions");
+  div.innerHTML = "<h3>Definicions</h3>";
+
+  paraules.forEach(w => {
+    const linea = document.createElement("div");
+    linea.innerText = `${w.numero}. ${w.def}`;
+
+    const btn = document.createElement("button");
+    btn.textContent    = "Pista";
+    btn.className      = "pista-btn";
+    btn.dataset.numero = w.numero;
+    btn.addEventListener("click", demanaPista);
+
+    linea.appendChild(btn);
+    div.appendChild(linea);
+  });
+}
+
+
+  // --- 1) demanaPista: escriu la pista i dispara validació directa
+// ── Demanar pista ─────────────────────────────────────────────────────────
+function demanaPista(ev) {
+  // 1) Identifiquem el mot pel número de pista
+  const num = +ev.currentTarget.dataset.numero;
+  const w   = paraules.find(x => x.numero === num);
+
+  // 2) Cerquem les caselles encara buides
+  const buides = w.cells.filter(({r, c}) => {
+    const inp = document.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+    return inp.value === "";
+  });
+  if (!buides.length) return;  // si ja està ple, no fem res
+
+  // 3) Triem a l’atzar una de les buides i hi posem la lletra correcta
+  const { r, c } = buides[Math.floor(Math.random() * buides.length)];
+  const idx      = w.cells.findIndex(cc => cc.r === r && cc.c === c);
+  const inp      = document.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+  inp.value = w.text[idx];
+
+  // 4) Després d’emplenar la casella, validem el mot per si ja es compleix
+  validaParaula(w);
+}
+
+
+
+  function gestorTecles(ev) {
+    const key = ev.key, r = +ev.target.dataset.r, c = +ev.target.dataset.c;
+    let nr=r, nc=c;
+    if (key==="ArrowUp")    nr--;
+    if (key==="ArrowDown")  nr++;
+    if (key==="ArrowLeft")  nc--;
+    if (key==="ArrowRight") nc++;
+    setTimeout(()=> {
+      document.querySelector(`input[data-r="${nr}"][data-c="${nc}"]`)?.focus();
+    }, 0);
+  }
+
+  // --- 2) onInput: mou focus i, si totes les caselles estan plenes, valida
+function onInput(ev) {
+  const inp = ev.target;
+  const r   = +inp.dataset.r;
+  const c   = +inp.dataset.c;
+
+  // small delay perquè el value ja s'hagi gravat
+  setTimeout(() => {
+    for (const w of paraules) {
+      const idx = w.cells.findIndex(cc => cc.r === r && cc.c === c);
+      if (idx === -1) continue;
+
+      // 1) mouem focus si no és l'última lletra
+      if (idx < w.cells.length - 1) {
+        const next = w.cells[idx + 1];
+        document
+          .querySelector(`input[data-r="${next.r}"][data-c="${next.c}"]`)
+          ?.focus();
+      }
+
+      // 2) si totes les caselles estan plenes, validem el mot
+      const totesPlenes = w.cells.every(({ r, c }) => {
+        return document.querySelector(`input[data-r="${r}"][data-c="${c}"]`)
+                      .value !== "";
+      });
+      if (totesPlenes) {
+        validaParaula(w);
+      }
+
+      break;
+    }
+  }, 0);
+}
+
+
+
+  function validaParaula(w) {
+  // 1) recollim i normalitzem l'entrada i la solució
+  const user = stripAccents(
+    w.cells.map(({ r, c }) =>
+      document.querySelector(`input[data-r="${r}"][data-c="${c}"]`).value
+    ).join("")
+  );
+  const target = stripAccents(w.text);
+  const ok = user === target;
+
+  if (ok) {
+    // mot correcte: pintem verd i comprovem final
+    w.cells.forEach(({ r, c }) => {
+      const inp = document.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+      inp.classList.add("correcte");
+      inp.onclick = null;        // desactivem l’esborrat
+    });
+    w.filled = true;
+    comprovaFinal();
+
+  } else {
+    // mot complet però incorrecte: per defecte ja no pintem vermell
+    // assignem onclick per esborrar tot el mot
+    w.cells.forEach(({ r, c }) => {
+      const inp = document.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+      inp.onclick = () => {
+        // netegem totes les caselles del mot
+        w.cells.forEach(({ r, c }) => {
+          const i2 = document.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+          i2.value = "";
+          i2.classList.remove("correcte");
+          i2.onclick = null;
+        });
+        // focus a la primera casella
+        const first = w.cells[0];
+        document.querySelector(
+          `input[data-r="${first.r}"][data-c="${first.c}"]`
+        )?.focus();
+      };
+    });
+  }
+}
+
+
+function comprovaFinal() {
+  if (paraules.every(w => w.filled)) {
+    console.log("🎉 Has acabat, llancem confeti");  // <-- DEBUG
+    document.getElementById("missatge-final").innerText =
+      "🎉 Fantàstic! Has resolt tots els mots encreuats!";
+    launchConfetti();
+  }
+}
+
+// Generador de confeti
+function launchConfetti() {
+  const container = document.getElementById("confetti-container");
+  console.log("⚡ confeti container:", container);    // <-- DEBUG
+
+  const colors = ["#f94144","#f3722c","#f9c74f","#90be6d","#577590"];
+  const count  = 80;
+
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("div");
+    el.className = "confetti-piece";
+    el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    el.style.left  = Math.random() * 100 + "vw";
+    el.style.opacity = Math.random() * 0.8 + 0.2;
+    const delay    = Math.random() * 0.5;
+    const duration = 2 + Math.random() * 1.5;
+    el.style.animationDelay    = delay + "s";
+    el.style.animationDuration = duration + "s";
+
+    container.appendChild(el);
+    setTimeout(() => el.remove(), (delay + duration) * 1000);
+  }
+}
+</script>
+
+
+</body>
+</html>
